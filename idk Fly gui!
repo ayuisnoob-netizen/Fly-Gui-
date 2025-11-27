@@ -1,0 +1,184 @@
+-- LocalScript inside StarterPlayerScripts
+
+local UIS = game:GetService("UserInputService")
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local root = character:WaitForChild("HumanoidRootPart")
+
+local flying = false
+local speed = 50
+local bodyGyro, bodyVelocity
+
+local TOGGLE_KEY = Enum.KeyCode.P
+
+
+
+--------------------------------------------------------------------
+-- GUI CREATION (Moveable + Plus/Minus + Custom Speed Box)
+--------------------------------------------------------------------
+local screenGui = Instance.new("ScreenGui")
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player.PlayerGui
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 210, 0, 155)
+frame.Position = UDim2.new(0.05, 0, 0.25, 0)
+frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+frame.Active = true
+frame.Draggable = true
+frame.Parent = screenGui
+
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(1, -20, 0, 40)
+toggleBtn.Position = UDim2.new(0, 10, 0, 10)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.TextScaled = true
+toggleBtn.Text = "Fly: OFF"
+toggleBtn.Parent = frame
+
+-- Minus button
+local minusBtn = Instance.new("TextButton")
+minusBtn.Size = UDim2.new(0, 60, 0, 35)
+minusBtn.Position = UDim2.new(0, 10, 0, 60)
+minusBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
+minusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+minusBtn.TextScaled = true
+minusBtn.Text = "-"
+minusBtn.Parent = frame
+
+-- Plus button
+local plusBtn = Instance.new("TextButton")
+plusBtn.Size = UDim2.new(0, 60, 0, 35)
+plusBtn.Position = UDim2.new(0, 140, 0, 60)
+plusBtn.BackgroundColor3 = Color3.fromRGB(40, 100, 40)
+plusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+plusBtn.TextScaled = true
+plusBtn.Text = "+"
+plusBtn.Parent = frame
+
+-- Speed display
+local speedText = Instance.new("TextLabel")
+speedText.Size = UDim2.new(1, -20, 0, 25)
+speedText.Position = UDim2.new(0, 10, 0, 100)
+speedText.BackgroundTransparency = 1
+speedText.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedText.TextScaled = true
+speedText.Text = "Speed: " .. speed
+speedText.Parent = frame
+
+-- Custom speed input box
+local customBox = Instance.new("TextBox")
+customBox.Size = UDim2.new(1, -20, 0, 25)
+customBox.Position = UDim2.new(0, 10, 0, 130)
+customBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+customBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+customBox.TextScaled = true
+customBox.PlaceholderText = "Enter custom speed..."
+customBox.ClearTextOnFocus = false
+customBox.Parent = frame
+
+
+
+--------------------------------------------------------------------
+-- Plus & Minus Buttons
+--------------------------------------------------------------------
+plusBtn.MouseButton1Click:Connect(function()
+	-- exponential speed increase
+	if speed < 100 then
+		speed += 10
+	elseif speed < 1000 then
+		speed += 100
+	elseif speed < 10000 then
+		speed += 1000
+	else
+		speed += 10000
+	end
+	speedText.Text = "Speed: " .. speed
+end)
+
+minusBtn.MouseButton1Click:Connect(function()
+	-- exponential decrease
+	if speed > 10000 then
+		speed -= 10000
+	elseif speed > 1000 then
+		speed -= 1000
+	elseif speed > 100 then
+		speed -= 10
+	else
+		speed = math.max(1, speed - 1)
+	end
+	speedText.Text = "Speed: " .. speed
+end)
+
+
+
+--------------------------------------------------------------------
+-- Custom Speed Input
+--------------------------------------------------------------------
+customBox.FocusLost:Connect(function(enterPressed)
+	if enterPressed then
+		local val = tonumber(customBox.Text)
+		if val then
+			speed = math.max(1, val)  -- no limit; infinite speed allowed
+			speedText.Text = "Speed: " .. speed
+		end
+	end
+end)
+
+
+
+--------------------------------------------------------------------
+-- Flying Functions (your original flying system)
+--------------------------------------------------------------------
+local function startFlying()
+	flying = true
+	toggleBtn.Text = "Fly: ON"
+
+	bodyGyro = Instance.new("BodyGyro")
+	bodyGyro.MaxTorque = Vector3.new(400000, 400000, 400000)
+	bodyGyro.P = 3000
+	bodyGyro.CFrame = root.CFrame
+	bodyGyro.Parent = root
+
+	bodyVelocity = Instance.new("BodyVelocity")
+	bodyVelocity.MaxForce = Vector3.new(400000, 400000, 400000)
+	bodyVelocity.Velocity = Vector3.zero
+	bodyVelocity.Parent = root
+
+	while flying and task.wait() do
+		bodyGyro.CFrame = workspace.CurrentCamera.CFrame
+
+		local moveDir = Vector3.zero
+		if UIS:IsKeyDown(Enum.KeyCode.W) then moveDir += workspace.CurrentCamera.CFrame.LookVector end
+		if UIS:IsKeyDown(Enum.KeyCode.S) then moveDir -= workspace.CurrentCamera.CFrame.LookVector end
+		if UIS:IsKeyDown(Enum.KeyCode.A) then moveDir -= workspace.CurrentCamera.CFrame.RightVector end
+		if UIS:IsKeyDown(Enum.KeyCode.D) then moveDir += workspace.CurrentCamera.CFrame.RightVector end
+
+		bodyVelocity.Velocity = moveDir * speed
+	end
+end
+
+local function stopFlying()
+	flying = false
+	toggleBtn.Text = "Fly: OFF"
+
+	if bodyGyro then bodyGyro:Destroy() end
+	if bodyVelocity then bodyVelocity:Destroy() end
+end
+
+
+
+--------------------------------------------------------------------
+-- Keybind + Button Toggle
+--------------------------------------------------------------------
+UIS.InputBegan:Connect(function(input, gpe)
+	if gpe then return end
+	if input.KeyCode == TOGGLE_KEY then
+		if flying then stopFlying() else startFlying() end
+	end
+end)
+
+toggleBtn.MouseButton1Click:Connect(function()
+	if flying then stopFlying() else startFlying() end
+end)
